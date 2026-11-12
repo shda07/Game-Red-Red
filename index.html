@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anti Kecanduan HP - Mini Game</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1f4068, #162447);
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        h1 {
+            margin: 5px 0;
+            font-size: 22px;
+            color: #e43f5a;
+            text-align: center;
+        }
+        p.subtitle {
+            font-size: 13px;
+            color: #a7a9be;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        #info-panel {
+            display: flex;
+            gap: 20px;
+            font-size: 15px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        #game-container {
+            width: 340px;
+            height: 450px;
+            background-color: #0f172a;
+            border: 3px solid #e43f5a;
+            border-radius: 16px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+            cursor: crosshair;
+        }
+        .item {
+            position: absolute;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .item:active {
+            transform: scale(0.8);
+        }
+        #btn-start {
+            margin-top: 15px;
+            padding: 10px 24px;
+            font-size: 16px;
+            background-color: #e43f5a;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(228, 63, 90, 0.4);
+            transition: background 0.2s, transform 0.1s;
+        }
+        #btn-start:hover {
+            background-color: #c22542;
+        }
+        #btn-start:active {
+            transform: scale(0.95);
+        }
+        #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.92);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            display: none;
+        }
+        #game-over-screen h2 {
+            color: #e43f5a;
+            margin-bottom: 5px;
+        }
+        #game-over-screen p {
+            font-size: 14px;
+            color: #cbd5e1;
+            margin-bottom: 15px;
+            padding: 0 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Detoks HP Challenge 📵</h1>
+    <p class="subtitle">Tangkap kegiatan seru, hindari layar HP!</p>
+    
+    <div id="info-panel">
+        <div>Skor: <span id="score">0</span></div>
+        <div>Waktu: <span id="timer">25</span>s</div>
+    </div>
+    
+    <div id="game-container" onclick="missClick(event)">
+        <!-- Item game akan muncul di sini secara dinamis -->
+        <div id="game-over-screen">
+            <h2>Waktu Habis!</h2>
+            <p id="final-message">Skor kamu: 0</p>
+            <button onclick="startGame()" style="padding: 8px 18px; font-size: 14px; background: #e43f5a; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold;">Main Lagi</button>
+        </div>
+    </div>
+
+    <button id="btn-start" onclick="startGame()">Mulai Game</button>
+
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const scoreDisplay = document.getElementById('score');
+        const timerDisplay = document.getElementById('timer');
+        const startBtn = document.getElementById('btn-start');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const finalMessage = document.getElementById('final-message');
+
+        let score = 0;
+        let timeLeft = 25;
+        let gameInterval = null;
+        let spawnerInterval = null;
+        let isPlaying = false;
+
+        // Daftar item: HP (mengurangi skor/nyawa) & Kegiatan positif (menambah skor)
+        const itemTypes = [
+            { icon: '📱', points: -2, type: 'bad' },
+            { icon: '💬', points: -1, type: 'bad' },
+            { icon: '⚽', points: 2, type: 'good' },
+            { icon: '📚', points: 2, type: 'good' },
+            { icon: '🎨', points: 3, type: 'good' },
+            { icon: '🌳', points: 2, type: 'good' }
+        ];
+
+        function startGame() {
+            // Reset state
+            gameContainer.querySelectorAll('.spawned-item').forEach(el => el.remove());
+            score = 0;
+            timeLeft = 25;
+            isPlaying = true;
+            scoreDisplay.textContent = score;
+            timerDisplay.textContent = timeLeft;
+            startBtn.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+
+            // Mulai Timer Mundur
+            gameInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = timeLeft;
+
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+
+            // Munculkan item secara berkala
+            spawnerInterval = setInterval(spawnItem, 650);
+        }
+
+        function spawnItem() {
+            if (!isPlaying) return;
+
+            const itemEl = document.createElement('div');
+            itemEl.classList.add('item', 'spawned-item');
+
+            // Pilih item secara acak
+            const randomData = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+            itemEl.textContent = randomData.icon;
+
+            // Posisi acak di dalam container
+            const maxX = gameContainer.clientWidth - 45;
+            const maxY = gameContainer.clientHeight - 45;
+            const randomX = Math.floor(Math.random() * maxX);
+            const randomY = Math.floor(Math.random() * maxY);
+
+            itemEl.style.left = randomX + 'px';
+            itemEl.style.top = randomY + 'px';
+
+            // Klik event untuk item
+            itemEl.addEventListener('click', (e) => {
+                e.stopPropagation(); // Biar gak kehitung miss-click
+                if (!isPlaying) return;
+
+                score += randomData.points;
+                if (score < 0) score = 0; // Batas minimal skor 0
+                scoreDisplay.textContent = score;
+
+                // Efek animasi klik hilang
+                itemEl.remove();
+            });
+
+            gameContainer.appendChild(itemEl);
+
+            // Item otomatis hilang sendiri setelah 1.2 detik kalau tidak diklik
+            setTimeout(() => {
+                if (itemEl.parentElement) {
+                    itemEl.remove();
+                }
+            }, 1200);
+        }
+
+        function missClick(e) {
+            // Kalau klik area kosong di dalam game container (opsional kalau mau dikasih penalti kecil atau dibiarkan)
+        }
+
+        function endGame() {
+            isPlaying = false;
+            clearInterval(gameInterval);
+            clearInterval(spawnerInterval);
+
+            // Bersihkan sisa item
+            gameContainer.querySelectorAll('.spawned-item').forEach(el => el.remove());
+
+            // Tampilkan layar game over
+            let pesanEvaluasi = "";
+            if (score >= 20) {
+                pesanEvaluasi = `Skor kamu ${score}! Wah, kamu jago banget nge-detoks diri dari kecanduan HP! 🎉`;
+            } else if (score >= 10) {
+                pesanEvaluasi = `Skor kamu ${score}. Lumayan, tapi masih sering tergoda HP nih! 😉`;
+            } else {
+                pesanEvaluasi = `Skor kamu ${score}. Kebanyakan pegang HP ya? Yuk perbanyak aktivitas seru di luar! 📱❌`;
+            }
+
+            finalMessage.textContent = pesanEvaluasi;
+            gameOverScreen.style.display = 'flex';
+            startBtn.style.display = 'block';
+            startBtn.textContent = 'Main Lagi';
+        }
+    </script>
+</body>
+</html>
